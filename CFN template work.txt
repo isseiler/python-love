@@ -1,0 +1,30 @@
+S3 new hire training CloudFormation templates I want to make.
+
+#Tag all buckets with the name of 'NHT-S3-isseiler'
+
+stacks to build
+
+- S3 bucket owner full control required on Puts
+	#create bucket, use prefix name of 's3-nht-require-object-ownership'
+	#create bucket policy requiring bucket-owner-full-control on PutObject actions
+
+EASY
+- create publicly readable bucket, given it a public ACL and public bucket policy
+
+
+MEDIUM
+- request payer scenario
+	- publicly writable but request payer is set. What happens to PUTs for Anon? How do you do a PUT?
+
+- if they have root creds
+	- create a bucket that no IAM user can delete where they must delete the bucket policy with their root account
+
+- broken replication scenario
+
+HARD
+
+Why is my event function not working? - URI encode the prefix filter special characters
+
+----------
+Forcibly clean up the buckets once finished - 
+Create a self cleaning Lambda function that will delete all buckets tagged with the name of NHT-2018-S3
