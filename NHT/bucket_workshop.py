@@ -9,14 +9,18 @@ import random
 import json
 from botocore.vendored import requests
 
+
 #set to True when ready to officially deploy / do final testing
 enable_public_buckets = False#True
-bucket_tag_name_value = 'NHT-2018-S3'
+new_hire_tag_name_value = 'NHT-2018-S3'
 
 region_name_we_want_to_create_buckets_in = 'us-west-2'
 
 def lambda_handler(event, context):
 
+    #Get the current AWS account ID of the actor 
+    aws_account_id = boto3.client('sts').get_caller_identity().get('Account')
+   
     def random_generator(size=4, chars=string.ascii_lowercase + string.digits):
         return ''.join(random.choice(chars) for x in range(size))
 
@@ -37,7 +41,7 @@ def lambda_handler(event, context):
                 'TagSet': [
                     {
                         'Key': 'Name',
-                        'Value': bucket_tag_name_value
+                        'Value': new_hire_tag_name_value
                     },
                 ]
             }
@@ -93,7 +97,7 @@ def lambda_handler(event, context):
                 'TagSet': [
                     {
                         'Key': 'Name',
-                        'Value': bucket_tag_name_value
+                        'Value': new_hire_tag_name_value
                     },
                 ]
             }
@@ -154,7 +158,7 @@ def lambda_handler(event, context):
                 'TagSet': [
                     {
                         'Key': 'Name',
-                        'Value': bucket_tag_name_value
+                        'Value': new_hire_tag_name_value
                     },
                 ]
             }
@@ -189,13 +193,13 @@ def lambda_handler(event, context):
     #START create_bucket_broken_event_notifications    
 
     def create_bucket_broken_event_notifications():
-        bucket_name = "s3-nht-broken-event-notifications-" + random_generator() #our bucket name
+        bucket_name = "s3-nht-broken-event-notifications-hard-" + random_generator() #our bucket name
 
         print(bucket_name)
         s3 = boto3.client('s3', region_name=region_name_we_want_to_create_buckets_in) #initialize s3 client  
         s3.create_bucket(Bucket=bucket_name, CreateBucketConfiguration={'LocationConstraint': region_name_we_want_to_create_buckets_in}) #create the bucket!
 
-
+        #put a NHT tag on the bucket
         s3resource = boto3.resource('s3')
         bucket_tagging = s3resource.BucketTagging(bucket_name)
         response = bucket_tagging.put(
@@ -203,28 +207,56 @@ def lambda_handler(event, context):
                 'TagSet': [
                     {
                         'Key': 'Name',
-                        'Value': bucket_tag_name_value
+                        'Value': new_hire_tag_name_value
                     },
                 ]
             }
         )
         
-        #TO DO:
-        #create a year= prefix in this bucket
+        #TO DO: Make the lambda function do something more than hello world. have it print S3 key info, etc.
+        
         directory_name = "year=" #it's name of your folders
         s3.put_object(Bucket=bucket_name, Key=(directory_name+'/'))
         
         #create a lambda function for this bucket and put the lambda ARN in the event notification
-            #new lambda function - brokenLambdaEventNotificationArn
-            #do all the things!
+        lambda_client = boto3.client('lambda')
+        lambda_function_creation_response = lambda_client.create_function(
+        FunctionName='NHT-S3-Training-YouCanDeleteThis',
+        Runtime='python3.6',
+        Role='arn:aws:iam::%s:role/lambda_basic_execution' % aws_account_id,
+        Handler='helloWorld.lambda_handler',
+        Code={
+            #'ZipFile': b'bytes',
+            'S3Bucket': 's3-nht-deployment-src',
+            'S3Key': 'lambda_functions/helloWorld.zip',
+            #'S3ObjectVersion': 'string'
+        },
+        Description='S3 new hire training function, you can delete this',
+        Timeout=30,
+        MemorySize=128,
+            Tags={
+        'Name': new_hire_tag_name_value
+        }
+        )
+
+        #allow the event bucket to invoke the lambda function
+        response = lambda_client.add_permission(
+            Action='lambda:InvokeFunction',
+            FunctionName='NHT-S3-Training-YouCanDeleteThis',
+            Principal='s3.amazonaws.com',
+            SourceAccount=aws_account_id,
+            SourceArn='arn:aws:s3:::%s' % bucket_name,
+            StatementId='ID-1',
+        )
         
+        #create the event notification on the newly created bucket
         bucket_notification = s3resource.BucketNotification(bucket_name)
         response = bucket_notification.put(
         NotificationConfiguration={
             'LambdaFunctionConfigurations': [
                 {
                     'Id': "What'sBrokenWithThisEvent",
-                    'LambdaFunctionArn': #brokenLambdaEventNotificationArn,
+                    'LambdaFunctionArn': lambda_function_creation_response['FunctionArn'], #brokenLambdaEventNotificationArn,
                     'Events': ['s3:ObjectCreated:*'],
                     'Filter': {
                         'Key': {
@@ -233,6 +265,7 @@ def lambda_handler(event, context):
                                     'Name': 'prefix',
                                     'Value': 'year='
                                 },
+                                
                             ]
                         }
                     }
@@ -243,8 +276,7 @@ def lambda_handler(event, context):
             
     #END create_bucket_broken_event_notifications    
     
-    #create buckets!
-    
+    #create problematic buckets!
     #create_public_bucket_with_bucket_owner_full_control()
     #create_public_bucket_with_request_payer()
     #create_a_bucket_that_requires_root_creds_to_delete()
