@@ -1,0 +1,50 @@
+#author isseiler
+#date: Jan 09, 2017
+#description: deletes all S3 buckets on an account that are tagged with 'NHT-2018-S3'
+# uses creds from local aws CLI config files.
+
+import boto3
+from functools import reduce  # forward compatibility for Python 3
+import operator
+
+#boto3.set_stream_logger('botocore') #debug logging at the ready!
+
+def lambda_handler(event, context):
+	
+	client = boto3.client('s3', region_name='us-east-1')
+	bucket_name_array = []	
+	bucket_list_response = client.list_buckets() # get a list of buckets
+	found_a_nht_bucket = 0
+
+	for bucket in bucket_list_response["Buckets"]:
+		#print(bucket['Name'])
+		bucket_name_array.append(bucket['Name'])
+
+	#print(bucket_name_array)	
+	for bucket_name in bucket_name_array:
+		try:
+			tag_response = client.get_bucket_tagging(
+		Bucket=bucket_name)			
+			
+			#Delete buckets with the tag name below!
+			if 'NHT-2018-S3' in tag_response['TagSet'][0]['Value']: #change 'NHT-2018-S3' to whatever tag on a bucket you have that you want to delete
+				found_a_nht_bucket += 1
+				print("deleting " + bucket_name + "!")
+				s3resource = boto3.resource('s3')
+				bucket_resource = s3resource.Bucket(bucket_name)
+				bucket_resource.objects.all().delete() #attempt to delete all objects that exist in the bucket
+				bucket_resource.delete() #delete the bucket since it should now be empty
+			
+		except Exception:
+			pass
+
+	if found_a_nht_bucket >= 1:
+		print("we found and deleted " + str(found_a_nht_bucket) + " bucket(s)!")
+		print("Script exiting! Have a nice day!")
+
+	if found_a_nht_bucket == 0:	
+		print("No buckets found that have NHT tags on them")
+		print("Script exiting! Have a nice day!")
+		
+
+lambda_handler(1,1)
