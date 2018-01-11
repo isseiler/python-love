@@ -218,17 +218,19 @@ def lambda_handler(event, context):
         directory_name = "year=" #it's name of your folders
         s3.put_object(Bucket=bucket_name, Key=(directory_name+'/'))
         
+        lambda_function_name_rnd_string = random_generator()
+        
         #create a lambda function for this bucket and put the lambda ARN in the event notification
         lambda_client = boto3.client('lambda')
         lambda_function_creation_response = lambda_client.create_function(
-        FunctionName='NHT-S3-Training-YouCanDeleteThis',
+        FunctionName='NHT-S3-Training-YouCanDeleteThis-' + lambda_function_name_rnd_string,
         Runtime='python3.6',
         Role='arn:aws:iam::%s:role/lambda_basic_execution' % aws_account_id,
-        Handler='helloWorld.lambda_handler',
+        Handler='eventNotificationTesting.lambda_handler',
         Code={
             #'ZipFile': b'bytes',
             'S3Bucket': 's3-nht-deployment-src',
-            'S3Key': 'lambda_functions/helloWorld.zip',
+            'S3Key': 'lambda_functions/eventNotificationTesting.zip',
             #'S3ObjectVersion': 'string'
         },
         Description='S3 new hire training function, you can delete this',
@@ -242,7 +244,7 @@ def lambda_handler(event, context):
         #allow the event bucket to invoke the lambda function
         response = lambda_client.add_permission(
             Action='lambda:InvokeFunction',
-            FunctionName='NHT-S3-Training-YouCanDeleteThis',
+            FunctionName='NHT-S3-Training-YouCanDeleteThis-' + lambda_function_name_rnd_string,
             Principal='s3.amazonaws.com',
             SourceAccount=aws_account_id,
             SourceArn='arn:aws:s3:::%s' % bucket_name,
